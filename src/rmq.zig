@@ -12,79 +12,65 @@ pub const Token = struct {
     prec: u8 = 0,
 };
 
-pub fn betterIndex(tokens: []const Token, left: ?usize, right: ?usize) ?usize {
-    if (left == null) return right;
-    if (right == null) return left;
+const none: u64 = std.math.maxInt(u64);
 
-    const l_idx = left.?;
-    const r_idx = right.?;
-    const l_tok = tokens[l_idx];
-    const r_tok = tokens[r_idx];
+/// Packs the split priority of an operator into one integer so the segment
+/// tree is a plain min over u64: shallowest paren depth first, then lowest
+/// precedence, then rightmost index (left associativity).
+fn key(tok: Token, i: usize) u64 {
+    if (tok.kind != .op) return none;
+    const inv_index: u64 = std.math.maxInt(u32) - @as(u32, @intCast(i));
+    return (@as(u64, tok.depth) << 40) | (@as(u64, tok.prec) << 32) | inv_index;
+}
 
-    if (l_tok.depth != r_tok.depth) {
-        return if (l_tok.depth < r_tok.depth) left else right;
-    }
-    if (l_tok.prec != r_tok.prec) {
-        return if (l_tok.prec < r_tok.prec) left else right;
-    }
-
-    return if (l_idx > r_idx) left else right;
+fn indexOf(k: u64) usize {
+    return std.math.maxInt(u32) - @as(u32, @truncate(k));
 }
 
 pub const SegmentTree = struct {
     alloc: std.mem.Allocator,
-    tokens: []const Token,
-    tree: []?usize,
+    tree: []u64,
     size: usize,
 
     pub fn init(alloc: std.mem.Allocator, tokens: []const Token) !SegmentTree {
-        var size: usize = 1;
-        while (size < tokens.len) size <<= 1;
-        const tree = try alloc.alloc(?usize, size * 2);
-        @memset(tree, null);
+        if (tokens.len >= std.math.maxInt(u32)) return error.TooManyTokens;
 
-        for (tokens, 0..) |tok, i| {
-            if (tok.kind == .op) {
-                tree[size + i] = i;
-            }
-        }
+        const size = tokens.len;
+        const tree = try alloc.alloc(u64, size * 2);
+
+        for (tokens, 0..) |tok, i| tree[size + i] = key(tok, i);
 
         var i: usize = size - 1;
         while (i > 0) : (i -= 1) {
-            tree[i] = betterIndex(tokens, tree[i * 2], tree[i * 2 + 1]);
+            tree[i] = @min(tree[i * 2], tree[i * 2 + 1]);
         }
 
-        return .{
-            .alloc = alloc,
-            .tokens = tokens,
-            .tree = tree,
-            .size = size,
-        };
+        return .{ .alloc = alloc, .tree = tree, .size = size };
     }
 
     pub fn deinit(self: *SegmentTree) void {
         self.alloc.free(self.tree);
     }
 
-    pub fn query(self: *SegmentTree, l: usize, r: usize) ?usize {
+    /// Index of the operator to split [l, r] on, or null if the range has none.
+    pub fn query(self: *const SegmentTree, l: usize, r: usize) ?usize {
         var left = l + self.size;
-        var right = r + self.size;
-        var best_left: ?usize = null;
-        var best_right: ?usize = null;
+        var right = r + self.size + 1;
+        var best = none;
 
-        while (left <= right) {
+        while (left < right) {
             if ((left & 1) == 1) {
-                best_left = betterIndex(self.tokens, best_left, self.tree[left]);
+                best = @min(best, self.tree[left]);
                 left += 1;
             }
-            if ((right & 1) == 0) {
-                best_right = betterIndex(self.tokens, self.tree[right], best_right);
+            if ((right & 1) == 1) {
                 right -= 1;
+                best = @min(best, self.tree[right]);
             }
             left >>= 1;
             right >>= 1;
         }
 
-        return betterIndex(self.tokens, best_left, best_right);
+        return if (best == none) null else indexOf(best);
     }
 };

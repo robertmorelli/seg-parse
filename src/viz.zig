@@ -7,21 +7,30 @@ const Side = enum {
     right,
 };
 
-pub fn writeAscii(alloc: std.mem.Allocator, writer: anytype, node: *const ast.Node) !void {
-    var prefix = std.ArrayList(u8).init(alloc);
-    defer prefix.deinit();
+pub fn writeAscii(alloc: std.mem.Allocator, writer: *std.Io.Writer, tree: *const ast.Tree) !void {
+    var prefix: std.ArrayList(u8) = .empty;
+    defer prefix.deinit(alloc);
 
-    try writeInorder(writer, node, &prefix, .root);
+    try writeInorder(alloc, writer, tree, tree.root, &prefix, .root);
 }
 
-fn writeInorder(writer: anytype, node: *const ast.Node, prefix: *std.ArrayList(u8), side: Side) !void {
-    if (node.right) |right| {
+fn writeInorder(
+    alloc: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    tree: *const ast.Tree,
+    index: u32,
+    prefix: *std.ArrayList(u8),
+    side: Side,
+) !void {
+    const node = tree.nodes[index];
+
+    if (node.right != ast.none) {
         const segment = switch (side) {
             .left => "|   ",
             .right, .root => "    ",
         };
-        try prefix.appendSlice(segment);
-        try writeInorder(writer, right, prefix, .right);
+        try prefix.appendSlice(alloc, segment);
+        try writeInorder(alloc, writer, tree, node.right, prefix, .right);
         prefix.shrinkRetainingCapacity(prefix.items.len - segment.len);
     }
 
@@ -33,13 +42,13 @@ fn writeInorder(writer: anytype, node: *const ast.Node, prefix: *std.ArrayList(u
     }
     try writer.print("{c} [h={d}]\n", .{ node.op, node.height });
 
-    if (node.left) |left| {
+    if (node.left != ast.none) {
         const segment = switch (side) {
-            .left => "    ",
-            .right, .root => "|   ",
+            .left, .root => "    ",
+            .right => "|   ",
         };
-        try prefix.appendSlice(segment);
-        try writeInorder(writer, left, prefix, .left);
+        try prefix.appendSlice(alloc, segment);
+        try writeInorder(alloc, writer, tree, node.left, prefix, .left);
         prefix.shrinkRetainingCapacity(prefix.items.len - segment.len);
     }
 }

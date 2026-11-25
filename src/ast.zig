@@ -1,35 +1,25 @@
 const std = @import("std");
 
+pub const none = std.math.maxInt(u32);
+
+/// Nodes live in one flat array indexed by token position: an operator token
+/// becomes an inner node, a value token becomes a leaf.
 pub const Node = struct {
     op: u8,
-    left: ?*Node,
-    right: ?*Node,
-    height: u16 = 0,
+    left: u32 = none,
+    right: u32 = none,
+    height: u32 = 0,
+};
 
-    pub fn deinit(self: *Node, alloc: std.mem.Allocator) void {
-        if (self.left) |l| {
-            l.deinit(alloc);
-            alloc.destroy(l);
-        }
-        if (self.right) |r| {
-            r.deinit(alloc);
-            alloc.destroy(r);
-        }
+pub const Tree = struct {
+    nodes: []Node,
+    root: u32,
+
+    pub fn deinit(self: *Tree, alloc: std.mem.Allocator) void {
+        alloc.free(self.nodes);
     }
 
-    pub fn computeHeights(self: *Node) u16 {
-        var left_h: u16 = 0;
-        var right_h: u16 = 0;
-
-        if (self.left) |l| {
-            left_h = l.computeHeights();
-        }
-        if (self.right) |r| {
-            right_h = r.computeHeights();
-        }
-
-        const max_child = if (left_h > right_h) left_h else right_h;
-        self.height = if (self.left == null and self.right == null) 0 else max_child + 1;
-        return self.height;
+    pub fn get(self: *const Tree, i: u32) ?*const Node {
+        return if (i == none) null else &self.nodes[i];
     }
 };
