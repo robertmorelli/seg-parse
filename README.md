@@ -1,11 +1,20 @@
 # seg-parse
 
-Parses arithmetic expressions by range-minimum queries instead of recursive descent.
+Parsing with range-minimum queries instead of recursive descent.
 
-Parentheses are stripped into a depth on each operator. The root of any
-subexpression is then the operator with the lowest (depth, precedence), rightmost
-on ties, so the tree is built by repeatedly asking a segment tree for that
-minimum and splitting the range around it.
+Give every operator a key: nesting depth first, then precedence, then position.
+The root of any subexpression is the operator with the smallest key in its
+range, so the whole tree comes from asking a segment tree for minimums. Each
+question is independent, which makes the approach parallel.
+
+| | |
+|---|---|
+| [`src/`](src/) | The idea on arithmetic expressions, in Zig. |
+| [`jpl/`](jpl/) | The idea on a real language: a Metal GPU lexer and parser for JPL that lexes and parses 12.9 MB in 22 ms, before the fastest CPU lexer finishes lexing. |
+
+## Expressions
+
+Requires Zig 0.16.
 
 ```
 $ zig build run -- --expr "v-(v+v)*v"
@@ -20,10 +29,6 @@ tree:
     \-- v [h=0]
 ```
 
-## Usage
-
-Requires Zig 0.16.
-
 ```
 zig build test
 zig build run -- --expr "<expr>"     # v, + - * /, parentheses
@@ -31,6 +36,11 @@ zig build run -- --seed 42           # random expression
 zig build run -Doptimize=ReleaseFast -- --bench 10000000
 ```
 
-## JPL on the GPU
+## JPL
 
-[`jpl/`](jpl/) applies the same idea to a real language: a Metal lexer and parser for JPL that lexes and parses 12.9 MB in 22 ms, faster than the fastest CPU lexer alone.
+Requires macOS with Metal. See [`jpl/README.md`](jpl/README.md).
+
+```
+cd jpl && make
+bin/jplparse FILE 20
+```

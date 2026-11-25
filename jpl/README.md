@@ -18,7 +18,11 @@ Both stages run in parallel over the whole input. Nothing walks the file in orde
 | CPU, scalar Zig lexer (`jpl_bench`) | 42.7 ms | | |
 | CPU, `src/cpu.c` | 52.2 ms | 38.4 ms | 90.6 ms |
 
-The GPU finishes lexing and parsing before the fastest CPU lexer finishes lexing. Its tokens and parse tree are checked against the CPU reference on every run.
+The GPU finishes lexing and parsing before the fastest CPU lexer finishes lexing.
+
+## Testing
+
+Every run checks the GPU's tokens and parse tree against the CPU reference, and the tokens match `jpl_bench`'s hashes. `--fuzz` generates programs from the `jpl_bench` fuzzer grammar, mutates some of them, and checks that both sides accept the same programs and build the same trees. About 185,000 programs agree so far.
 
 ## Usage
 
