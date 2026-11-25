@@ -1,2 +1,4 @@
 zig-out/
 .zig-cache/
+jpl/bin/
+jpl/fuzz_fail.jpl
